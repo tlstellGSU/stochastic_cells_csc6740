@@ -1,0 +1,384 @@
+% CSC 6740 class presentation (Beamer), 10 x 5.625 in, laid out like the Google Slides version.
+% Story: A walls move -> B the motion is stochastic -> C OU model -> D data -> E fitted parameters ->
+% F a simple stochastic simulation. Model evaluation is in the appendix (numbered separately).
+% Build (from this folder): latexmk -pdf deck.tex   (speaker notes on a second screen: latexmk -pdf deck_notes.tex)
+% Figures: figures/ (finished images; see README.md for their provenance).
+% The current version of the talk, with animations and the travel-time results, is class_deck_2026-11-18.pptx.
+\documentclass[t]{beamer}
+\geometry{papersize={10in,5.625in}}
+\ifdefined\shownotes
+  \setbeameroption{show notes on second screen=right}
+\fi
+\usepackage[T1]{fontenc}
+\usepackage{helvet}                      % Helvetica: the metric twin of Arial
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{amsmath,amssymb}
+\usepackage{array}
+\usepackage{appendixnumberbeamer}
+\usepackage[absolute,overlay]{textpos}
+\setlength{\TPHorizModule}{1in}
+\setlength{\TPVertModule}{1in}
+\textblockorigin{0in}{0in}
+\graphicspath{{figures/}}
+
+% ---- Google deck look -----------------------------------------------------------------------------
+\definecolor{bul}{HTML}{595959}
+\definecolor{cap}{HTML}{595959}
+\setbeamertemplate{navigation symbols}{}
+\setbeamercolor{normal text}{fg=black,bg=white}
+\setbeamertemplate{frametitle}{}
+\setbeamertemplate{footline}{\hfill{\color{cap}\fontsize{8}{9}\selectfont
+  \insertframenumber\,/\,\inserttotalframenumber}\hspace*{0.25in}\vspace*{0.12in}}
+\newcommand{\gsize}[1]{\fontsize{#1}{\the\dimexpr #1pt*115/100\relax}\selectfont}
+% slide titles: full-width at (0.43, 0.30) in; left-column at (0.43, 0.72) in, 3.05 in wide
+\newcommand{\gtitle}[1]{\begin{textblock}{9.1}(0.43,0.36)\fontsize{20}{24}\selectfont\textcolor{black}{#1}\end{textblock}}
+\newcommand{\gtitleL}[1]{\begin{textblock}{3.05}(0.43,0.76)\raggedright\fontsize{20}{24}\selectfont\textcolor{black}{#1}\end{textblock}}
+% bullets: gray dot at 7.5 pt, text at 22 pt, 6 pt above each paragraph, 1.15 line spacing
+\newenvironment{gitems}[1][15]{\gsize{#1}\begin{list}{\makebox[14.5pt][l]{\textcolor{bul}{\textbullet}}}%
+  {\setlength{\leftmargin}{22pt}\setlength{\labelwidth}{14.5pt}\setlength{\labelsep}{0pt}%
+   \setlength{\itemsep}{6pt}\setlength{\parsep}{0pt}\setlength{\topsep}{0pt}\setlength{\itemindent}{0pt}}%
+  \raggedright}{\end{list}}
+% \gbox{x}{y}{w}{content}, \gimg{x}{y}{w}{h}{file}, \gimgw{x}{y}{w}{file}, \geqn{x}{y}{w}{math}, \gcap{x}{y}{w}{text}
+\newcommand{\gbox}[4]{\begin{textblock}{#3}(#1,#2)#4\end{textblock}}
+\newcommand{\gimg}[5]{\begin{textblock}{#3}(#1,#2)\includegraphics[width=#3in,height=#4in]{#5}\end{textblock}}
+\newcommand{\gimgw}[4]{\begin{textblock}{#3}(#1,#2)\includegraphics[width=#3in]{#4}\end{textblock}}
+\newcommand{\geqn}[4]{\begin{textblock}{#3}(#1,#2)\centering\fontsize{17}{21}\selectfont$\displaystyle #4$\end{textblock}}
+\newcommand{\gcap}[4]{\begin{textblock}{#3}(#1,#2)\centering\fontsize{11}{13}\selectfont\textcolor{cap}{#4}\end{textblock}}
+\newcommand{\kT}{k_B T}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+\begin{document}
+
+% =================================================================================================== title
+\begin{frame}[plain]
+\gbox{0.5}{1.82}{9.0}{\centering\fontsize{30}{36}\selectfont Stochastic Cells\\ Diffusion Inside a Randomly Moving Membrane}
+\gbox{0.5}{3.12}{9.0}{\centering\fontsize{16}{19}\selectfont Tommy Stell, Georgia State University}
+\note{(20 s) I'm Tommy Stell. This project mines public high-speed videos of red blood cells. The story: cell
+walls move; the motion is random; a simple stochastic model describes it; the data we have; the parameters the
+data give; and a simple simulation of molecules inside the moving wall.}
+\end{frame}
+
+% =================================================================================================== A
+\begin{frame}
+\gtitle{Cell walls move, but cell models fix them}
+\gbox{0.43}{0.95}{9.1}{\begin{gitems}
+\item Models of transport and signaling inside a cell solve their equations in a fixed shape
+\item Real membranes flicker: about 30\,nm rms in red blood cells, 24\,nm once the cell is held in a trap
+      (Caselli 2024); the amplitude rises 1.4$\times$ with ATP (Monzel 2015)
+\item Nanometres can matter: touch receptors gate their ion channels at $\sim$13\,nm of displacement (Poole 2014)
+\item Of 38 experimental papers we reviewed, none tests whether this motion changes transport inside the cell
+\item Public 1\,kHz flicker videos let us describe the wall statistically, fit a model to it, and simulate what
+      fixing it costs
+\end{gitems}}
+\note{(55 s) Almost every model of transport or signaling inside a cell solves its equations in a fixed shape.
+But membranes are never still. A red blood cell's edge moves about 30 nanometres; less once it is held in an
+optical trap, more when the cell has ATP. That sounds negligible, but touch receptors open their ion channels at
+about 13 nanometres of displacement, so nanometre motion is not automatically harmless. Of 38 experimental papers
+we reviewed, none tests whether this motion changes transport inside the cell. Either answer is useful: if it
+matters, fixed-shape models are biased; if it does not, we can say by how much and where that stops being true.}
+\end{frame}
+
+\begin{frame}
+\gtitle{Two questions about a randomly moving cell wall}
+\gbox{0.43}{0.95}{9.1}{\begin{gitems}
+\item Q1, inverse: what can contour recordings tell us about the wall?
+\item Q2, forward: how much does wall motion change transport inside the cell?
+\item Pipeline: describe the wall statistically, fit a stochastic model, simulate transport inside it
+\end{gitems}}
+\gimg{0.77}{2.67}{8.46}{2.79}{pipeline_2d.png}
+\note{(40 s) Two questions. Inverse: what can the recordings tell us about the wall? Forward: does its motion
+matter inside? The figure is the pipeline: track the contour, describe it as a random field, ask which features
+of that field are identifiable, then simulate diffusion inside it. The transport results are computed in a
+two-dimensional equatorial section.}
+\end{frame}
+
+% =================================================================================================== B
+\begin{frame}
+\gtitleL{The wall moves at random}
+\gbox{0.43}{1.6}{3.05}{\begin{gitems}
+\item One red blood cell's contour for one second, filmed at 1\,kHz: red outward, blue inward
+\item The motion is irregular in angle and in time
+\item Raw wall motion is 23--32\,nm rms per contour point, under 1\% of the 4\,$\mu$m radius
+\end{gitems}}
+\gimg{3.75}{0.81}{5.85}{4.03}{gs_kymograph.png}
+\note{(45 s) This is the measured wall of one cell over one second, unrolled around the contour: red where it
+bulges out, blue where it moves in. There is no regular pattern in angle or in time. The motion is tens of
+nanometres, under one percent of the radius.}
+\end{frame}
+
+\begin{frame}
+\gtitle{It moves as a Gaussian process with memory}
+\gimgw{1.0}{0.97}{8.0}{stochastic_stats.png}
+\gbox{0.43}{4.0}{9.1}{\begin{gitems}[14]
+\item (a) Displacements are close to Gaussian: kurtosis 3.01--3.39 across the 11 videos (3 for a Gaussian)
+\item (b) Shape modes decorrelate over tens of ms, roughly exponentially: the signature of an
+      Ornstein--Uhlenbeck (OU) process
+\end{gitems}}
+\note{(50 s) Two statistics say what kind of random. Left: all displacements in units of their standard
+deviation lie close to a Gaussian; kurtosis is 3.0 to 3.4 per video, against 3 for a Gaussian. Right: the
+autocorrelation of the largest shape mode decays over tens of milliseconds, close to an exponential in the cell
+shown. A Gaussian process with exponentially decaying memory is an Ornstein-Uhlenbeck process, the model on the
+next slide. Some cells keep slow correlation past 100 ms; that misfit comes back later.}
+\end{frame}
+
+% =================================================================================================== C
+\begin{frame}
+\gtitleL{Model: each shape mode is an OU process}
+\gbox{0.43}{1.6}{3.05}{\begin{gitems}
+\item Each shape mode relaxes at a rate set by bending, tension, confinement and viscosity
+\item P: thermal noise only
+\item A: adds a forcing with memory $\tau_a$ and strength $a$, shared by all modes
+\item A is a colored effective temperature; nothing in it shows the forcing is ATP-driven
+\end{gitems}}
+\geqn{4.0}{0.38}{5.6}{du_{lm}=-r_l\,u_{lm}\,dt+\sqrt{2D_l}\,dW\ \ (+\,f\,dt\ \text{in A})}
+\geqn{4.0}{0.88}{5.6}{S_l(\omega)=\frac{2D_l}{\omega^2+r_l^2}\Big[1+\underbrace{\frac{a}{1+\omega^2\tau_a^2}}_{\text{model A only}}\Big]}
+\gimg{4.21}{1.86}{4.93}{3.45}{gs_spectrum.png}
+\note{(60 s) I write the cell as a sphere plus spherical-harmonic wrinkles u-lm. Each wrinkle is an OU process:
+pulled back at rate r-l, set by bending, tension, confinement and viscosity, and kicked by thermal noise. That is
+model P. Model A adds a force f that is itself an OU process, with memory tau-a and strength a relative to the
+thermal noise; it multiplies the passive Lorentzian by one plus a colored term, which adds power below one over
+tau-a, as in the plot. A is really a colored effective temperature.}
+\end{frame}
+
+\begin{frame}
+\gtitleL{The camera sees one slice of the shape}
+\gbox{0.43}{1.6}{3.05}{\begin{gitems}
+\item The microscope sees the equatorial contour, not the 3D shape
+\item Each contour mode $q$ sums all 3D modes with $l\ge q$ and $l+q$ even
+\item So even a passive cell mixes many relaxation rates in each contour mode
+\end{gitems}}
+\geqn{4.0}{0.42}{5.6}{h_q(t)=R\!\!\sum_{l\ge q,\ l+q\ \text{even}}\!\! Y_{lq}\big(\tfrac{\pi}{2},0\big)\,u_{lq}(t)}
+\gimg{3.80}{1.34}{5.74}{3.96}{gs_projection.png}
+\note{(40 s) The camera sees only the equator. The bars show how much each 3D mode feeds contour modes 2 and 3;
+the weights level off, so every contour mode is a sum of many relaxation rates. I fit the exact observed
+spectrum, including 1 ms exposure averaging, tracker smoothing and white noise, with a Whittle likelihood.}
+\end{frame}
+
+% =================================================================================================== D
+\begin{frame}
+\gtitleL{Data: 11 public videos, tracked and validated}
+\gbox{0.43}{1.6}{3.05}{\begin{gitems}
+\item Caselli et al.\ (2024): 1\,kHz for 5\,s; 6 free, 5 trapped, 4 matched pairs, 7 cells
+\item Contour on 2048 rays; synthetic frames: 96\% of the motion recovered, noise far below the signal
+\item Noise level calibrated on 25 particles stuck to the glass
+\item Features: Fourier contour modes $q=2$--6
+\end{gitems}}
+\geqn{4.0}{0.42}{5.6}{y(\theta_j,t_k)=\mathcal{S}_\theta\Big[\frac{1}{\Delta}\int_{t_k}^{t_k+\Delta}\mathcal{G}\big(h(\cdot,s)\big)\,ds\Big]+\zeta_{jk}}
+\gimg{3.75}{1.28}{5.85}{3.9}{gs_tracker.png}
+\gcap{3.75}{5.2}{5.85}{$\mathcal{G}$: image formation; $\Delta$ = 1\,ms exposure; $\mathcal{S}_\theta$: tracker smoothing; $\zeta$: white tracking noise}
+\note{(60 s) The data are the public deposit behind Caselli et al. 2024: eleven videos, six free cells and five
+held in an optical trap, four of them the same cell both ways. The equation is what a frame measures: the wall,
+blurred by the optics, averaged over the 1 ms exposure, smoothed by the tracker, plus white noise. Video has no
+ground truth, so I rendered synthetic frames from each video's own intensity profile and noise: the tracker
+recovers 96 percent of imposed motion, and its noise is far below the signal in the modes we use. I calibrate
+the noise on dust stuck to the glass.}
+\end{frame}
+
+% =================================================================================================== E
+\begin{frame}
+\gtitle{Fitted parameters: the two models side by side}
+\gbox{0.43}{0.95}{9.1}{\centering\fontsize{14}{17}\selectfont\renewcommand{\arraystretch}{1.45}%
+\begin{tabular}{|L{2.25in}|L{2.95in}|L{3.2in}|}
+\hline
+ & \textbf{Passive OU (P)} & \textbf{Colored OU (A)} \\ \hline
+Bending $\kappa$ & 127--314 $\kT$ \ (11/11) & not identifiable \ (0/11) \\ \hline
+Viscosity $\eta$ & 0.008--0.030 Pa\,s \ (11/11) & collapses toward 0 in some cells \\ \hline
+Tension $\sigma R^2/\kT$ & not identifiable \ (0/11) & --- \\ \hline
+Forcing memory $\tau_a$ & --- & 12--60 ms \ (11/11) \\ \hline
+Forcing strength $a$ & --- & 53--3200 \ (11/11) \\ \hline
+Data prefer & & A in all 11: $\Delta$AIC $+796$ to $+1479$ \\ \hline
+\end{tabular}}
+\gcap{0.43}{3.66}{9.1}{Ranges over the 11 videos. ($k$/11): videos whose 95\% profile-likelihood interval closes.
+P with temperature fixed at 37\,$^\circ$C. Refitted passive simulations: $\Delta$AIC 95\% quantiles 27--554.}
+\gbox{0.43}{4.12}{9.1}{\begin{gitems}[14]
+\item P gives clean moduli, but it is the model the data reject. A pins the forcing (memory $\approx$30\,ms,
+      $a\gg1$: the slow flicker is mostly not thermal)
+\item Under A, absolute stiffness trades off against the noise level, so only ratios are identified; A still
+      misfits below 30\,Hz (appendix)
+\end{gitems}}
+\note{(80 s) Both fits side by side. The passive OU model, with temperature fixed at body temperature, returns a
+clean bending modulus, 130 to 310 kT, and an effective viscosity of about 10 to 40 times that of water, with
+closed 95 percent intervals in all eleven videos; tension is not identifiable. But the data reject this model:
+the colored model wins in all eleven videos by 800 to 1500 AIC units, far beyond what refitted passive
+simulations produce. The colored model pins down the forcing: a memory of about 30 milliseconds, 12 to 60, and a
+strength much larger than one, so the slow part of the flicker is mostly not thermal. It does not pin down
+stiffness: scaling stiffness, viscosity and noise level together leaves the spectra unchanged. And it still
+misfits below 30 Hz, so its values are best-fit values of an approximate model.}
+\end{frame}
+
+% =================================================================================================== F
+\begin{frame}
+\gtitleL{Prediction: an effect of about 0.1\%}
+\gbox{0.43}{1.6}{3.05}{\begin{gitems}
+\item A molecule enters through one channel; $\Phi$ is the share within $0.3R$ of the centre
+\item The enclosed cytosol is carried by the wall, so a fluid parcel moves back and forth rather than drifting
+\item Estimate: $\Delta\Phi/\Phi\approx20(\sigma/R)^2\approx0.1\%$ for a red blood cell
+\item 1\% would take $\sim$90\,nm of wall motion
+\end{gitems}}
+\geqn{4.0}{1.95}{5.6}{\int_0^t\mathbf{v}\,ds=\sum_k U_k\big[h_k(t)-h_k(0)\big]}
+\geqn{4.0}{3.12}{5.6}{\frac{\Delta\Phi}{\Phi}\sim\frac{\mathrm{var}(h)\,|U|^2}{DT}\sim20\Big(\frac{\sigma_{\delta h}}{R}\Big)^2\approx10^{-3}}
+\gcap{4.0}{4.2}{5.6}{$T=0.05\,R^2/D$; a heuristic second-order estimate made before any simulation, not a theorem}
+\note{(45 s) Now the forward problem. A molecule enters through one channel and I measure Phi, the share near
+the centre after a fixed time. The cytosol is enclosed and incompressible, so the wall drags it along and a
+parcel just moves back and forth; its displacement is set by the change in the wall, not its history. So the
+effect should go through the wall's variance: 20 times sigma over R squared, about 0.1 percent for a red blood
+cell, made before any simulation.}
+\end{frame}
+
+\begin{frame}
+\gtitle{A simple simulation: the fitted wall, with molecules inside}
+\gimgw{0.7}{0.95}{8.6}{simple_simulation.png}
+\gbox{0.43}{3.72}{9.1}{\begin{gitems}[14]
+\item (a, b) Modes $q=2$--6 simulated from model A fitted to the same cell: rms 23\,nm, against 21\,nm measured
+\item (c) Molecules enter at a channel, diffuse, and reflect off the moving wall (toy: motion $\times10$, still fluid)
+\item Full computation, 11 cells $\times$ 12 walls, cytosol carried: moving vs frozen wall changes $\Phi$ by
+      $-0.03\pm0.01\%$
+\end{gitems}}
+\note{(70 s) Left, the measured wall restricted to the five modes we model; middle, a wall simulated from the
+colored OU model fitted to the same cell, on the same colour scale. The rms agrees to 2 nm. The simulation looks
+busier in time because the data are averaged over the 1 ms exposure and smoothed by the tracker. Right, the
+simulation idea: molecules enter through one channel and diffuse, reflected by the moving wall, here with the
+motion exaggerated ten times so you can see it. In the full computation, over 11 cells and 12 simulated walls
+each, with the cytosol carried along by the wall, moving versus frozen walls change Phi by three hundredths of a
+percent.}
+\end{frame}
+
+\begin{frame}
+\gtitle{Cytosol carried: wall motion changes transport by about 0.1\% or less}
+\gbox{1.7}{1.2}{6.6}{\fontsize{15}{18}\selectfont\renewcommand{\arraystretch}{1.75}%
+\begin{tabular}{|L{2.8in}|C{1.6in}|C{1.6in}|}
+\hline
+\textbf{Change in $\Phi$} & \textbf{$D$ = 5 $\mu$m$^2$/s} & \textbf{$D$ = 0.5 $\mu$m$^2$/s} \\ \hline
+Wall motion, cytosol carried & $-0.03\pm0.01$\% & $-0.02\pm0.01$\% \\ \hline
+Carried vs still medium & $-0.2\pm0.2$\% & $-0.6\pm0.1$\% \\ \hline
+Thermal part of the flicker & $+0.05\pm0.04$\% & $-0.03\pm0.04$\% \\ \hline
+Wall motion, still medium & $+0.3\pm0.4$\% & $+1.3\pm0.4$\% \\ \hline
+\end{tabular}}
+\gbox{1.7}{3.6}{6.6}{\centering\fontsize{13}{15}\selectfont\textcolor{cap}{Pooled over 11 cells, 12 wall paths each,
+extrapolated grid; statistical errors}}
+\note{(40 s) Pooled over 11 cells and 12 wall paths, after grid extrapolation. With the cytosol carried, wall
+motion changes transport by a few hundredths of a percent; carried versus still cytosol by under 1 percent. On
+our first grid the medium effect looked like 2 to 3 percent, which was mostly discretization error. Walls taken
+straight from the tracked videos give the same answer.}
+\end{frame}
+
+% =================================================================================================== end
+\begin{frame}
+\gtitle{Conclusions}
+\gbox{0.43}{1.0}{9.1}{\begin{gitems}[16]
+\item Red blood cell walls move by 20--30\,nm, as a Gaussian process with memory of tens of ms
+\item An OU model per shape mode describes them, but needs a colored, non-thermal forcing with memory
+      $\tau_a\approx12$--60\,ms
+\item Contour data identify that forcing and ratios of the moduli, not absolute stiffness
+\item Simulated with the fitted model, wall motion changes transport inside the cell by about 0.1\% or less;
+      about 90\,nm of motion would be needed for 1\%
+\item Next: an ATP-depleted control, and a discocyte rather than a spherical shape
+\item Code and data pipeline: github.com/tlstellGSU/brownian\_cells
+\end{gitems}}
+\note{(45 s) Red blood cell walls move by tens of nanometres as a Gaussian process with memory. An OU model per
+shape mode describes that, but it needs a non-thermal colored forcing with a memory of tens of milliseconds. The
+contours identify that forcing and ratios of the moduli, not stiffness itself. Simulating molecules inside walls
+drawn from the fitted model, the motion changes transport by about 0.1 percent or less: for red blood cells a
+fixed wall is a good approximation, and it would take walls moving about 90 nm to reach one percent. Next: an
+ATP-depleted control and a realistic shape. Thank you.}
+\end{frame}
+
+\begin{frame}
+\gtitle{References}
+\gbox{0.43}{0.95}{9.1}{\fontsize{10}{11.5}\selectfont\raggedright
+\setlength{\parskip}{5pt}
+N. Caselli, M. Garc\'ia-Verdugo, M. Calero, et al. Red blood cell flickering activity locally controlled by
+holographic optical tweezers. iScience, 2024.\par
+N. Caselli. Red blood cells TIF images (data deposit, CC BY 4.0). 2024.\par
+C. Monzel, D. Schmidt, C. Kleusch, et al. Measuring fast stochastic displacements of bio-membranes with dynamic
+optical displacement spectroscopy. Nature Communications, 2015.\par
+K. Poole, R. Herget, L. Lapatsina, H.-D. Ngo, and G. R. Lewin. Tuning Piezo ion channels to detect
+molecular-scale movements relevant for fine touch. Nature Communications, 2014.\par
+S. T. Milner and S. A. Safran. Dynamical fluctuations of droplet microemulsions and vesicles. Physical Review A,
+1987.\par
+H. A. Faizi, C. J. Reeves, V. N. Georgiev, P. M. Vlahovska, and R. Dimova. Fluctuation spectroscopy of giant
+unilamellar vesicles using confocal and phase contrast microscopy. Soft Matter, 2020.\par
+P. Whittle. Estimation and information in stationary time series. Arkiv f\"or Matematik, 1953.\par
+H. Akaike. A new look at the statistical model identification. IEEE Transactions on Automatic Control, 1974.\par
+A. Raue, C. Kreutz, T. Maiwald, et al. Structural and practical identifiability analysis of partially observed
+dynamical models by exploiting the profile likelihood. Bioinformatics, 2009.\par
+D. Prichard and J. Theiler. Generating surrogate data for time series with several simultaneously measured
+variables. Physical Review Letters, 1994.\par
+H. Turlier, D. A. Fedosov, B. Audoly, et al. Equilibrium physics breakdown reveals the active nature of red blood
+cell flickering. Nature Physics, 2016.\par}
+\note{Not presented; for questions.}
+\end{frame}
+
+% =================================================================================================== appendix
+\appendix
+
+\begin{frame}
+\gtitleL{Appendix: fluctuations fix ratios, not stiffness}
+\gbox{0.43}{1.6}{3.05}{\begin{gitems}
+\item Scaling the moduli, viscosity and temperature together leaves the data unchanged
+\item So the profile of $\kappa$ is flat when the temperature is free
+\item The ratios $\kappa/\eta$, $\bar\sigma$ and $\bar\gamma$ are still identifiable: recovered within 4\% on
+      simulated data
+\end{gitems}}
+\geqn{4.0}{0.45}{5.6}{(\kappa,\ \sigma,\ \gamma,\ \eta,\ T_\mathrm{eff})\ \longmapsto\ c\,(\kappa,\ \sigma,\ \gamma,\ \eta,\ T_\mathrm{eff})}
+\gimg{3.75}{1.21}{5.85}{3.9}{gs_identifiability.png}
+\note{With temperature fixed, kappa's profile likelihood has a minimum (orange); with temperature free it is
+flat to one part in a billion (blue). sigma-bar = sigma R squared over kappa; gamma-bar = gamma R to the fourth
+over kappa. Consequence: the published trap-induced stiffening is a variance ratio, so it is equally a fall in
+forcing.}
+\end{frame}
+
+\begin{frame}
+\gtitle{Appendix: the passive model is rejected, even after calibration}
+\gimgw{1.42}{0.97}{7.17}{model_selection.png}
+\gbox{0.43}{4.0}{9.1}{\begin{gitems}[14]
+\item P loses in all 11 videos (left, $\Delta$AIC $+796$ to $+1479$); refitted passive simulations give 95\%
+      quantiles of only 27--554, and on synthetic passive data P wins 3 of 4 times (right)
+\item This is not proof of activity: a passive model with a broad spread of rates comes close, and there is no
+      ATP-depleted control
+\end{gitems}}
+\note{With 25,000 periodogram ordinates any wrong model loses AIC by a lot, so I calibrated: three passive
+generators simulated through the full observation model and refit exactly like the data. The four calibration
+cells gave 1151 to 1479.}
+\end{frame}
+
+\begin{frame}
+\gtitle{Appendix: the colored-forcing model also misfits every cell}
+\gimgw{0.95}{0.97}{8.11}{misfit.png}
+\gbox{0.43}{4.0}{9.1}{\begin{gitems}[14]
+\item Model A fits better, but misfits every cell: data over model is above 1 below 2\,Hz and below 1 at
+      3--30\,Hz (median over modes $q=2$--6)
+\item So its fitted parameters are best-fit values of a wrong model, and the forcing needs a spread of time scales
+\end{gitems}}
+\note{A posterior predictive check gives chi-squared of 488 to 900 where 99 percent of simulations fall near 200
+or below. A second colored term helps but does not fix it.}
+\end{frame}
+
+\begin{frame}
+\gtitleL{Appendix: injection tests}
+\gbox{0.43}{1.6}{3.05}{\begin{gitems}
+\item 100\,nm kicks injected into real frames were detected in only 4 of 12 runs
+\item Real cells: kurtosis 3.01--3.39, not the 4.1 reported for free cells
+\item Tracking noise can turn an MSD exponent of 1 into the reported $\sim$1/4; corrected, it is 0.29--0.81 in
+      7 cells
+\end{gitems}}
+\gimg{3.75}{0.88}{5.85}{3.9}{gs_markers.png}
+\note{Caselli et al. report localized active kickers of about 100 nm. Narrow kicks (50 nm) vanish into the
+Gaussian band in all 12 runs; at 100 nm they are detected in 4 of 12, so the reported kickers sit at the
+detection limit. One video and a guessed kick rate, since none is reported.}
+\end{frame}
+
+\begin{frame}
+\gtitleL{Appendix: a second-order effect}
+\gbox{0.43}{1.6}{3.05}{\begin{gitems}
+\item Particles on the fitted walls of one cell, scaled by a factor $s$
+\item The effect follows $bs^2+cs^4$; a held-out run at $s=1$ agrees in 5 of 6 cases
+\item Predicted effect at the real amplitude: $b=-0.14\pm0.06\%$ of $\Phi$ over 12 walls of this cell
+\end{gitems}}
+\gimg{3.75}{0.69}{5.85}{4.27}{gs_particles.png}
+\note{The six cases are 3 walls times 2 target radii (0.3R and 0.5R). On the same walls the grid extrapolation
+gives -0.08 +/- 0.04 percent; the paired difference is -0.06 +/- 0.03 percent. Both are of order 0.1 percent.}
+\end{frame}
+
+\end{document}

@@ -1,0 +1,16 @@
+# raw videos (14 GB, downloaded separately; see README.md) and pipeline outputs
+data/
+output/
+__pycache__/
+# LaTeX build files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.synctex.gz
